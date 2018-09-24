@@ -1,6 +1,7 @@
 // define variables
 var game;
 var player;
+var background;
 var platforms;
 var badges;
 var items;
@@ -8,20 +9,57 @@ var cursors;
 var jumpButton;
 var text;
 var winningMessage;
+var lostMessage;
 var won = false;
+var lost = false;
 var currentScore = 0;
 var winningScore = 100;
+var currentLife = 2;
+var ItemsAleatorios = ["coin","coin","coin","coin","coin","coin","coin","coin","poison","poison","star"];
+
+//Generacion aleatoria de Items
+function obtenerTipo(){
+
+    if(ItemsAleatorios.length > 0)
+    var tipo;
+    var tipoDevuelto;
+    var numAleatorio = Math.floor(Math.random() * (ItemsAleatorios.length - 0));
+    tipoDevuelto = ItemsAleatorios[numAleatorio];
+    ItemsAleatorios.splice(numAleatorio,1);
+    return tipoDevuelto;
+    
+}
 
 // add collectable items to the game
 function addItems() {
+  
   items = game.add.physicsGroup();
-  createItem(375, 300, 'coin');
+  createItem(225, 500, obtenerTipo());
+  createItem(525, 500, obtenerTipo());
+  createItem(400, 375, obtenerTipo());
+  createItem(475, 275, obtenerTipo());
+  createItem(75, 225, obtenerTipo());
+  createItem(725, 225, obtenerTipo());
+  createItem(225, 175, obtenerTipo());
+  createItem(300, 75, obtenerTipo());
+  createItem(575, 125, obtenerTipo());
+  createItem(150, 25, obtenerTipo());
+  createItem(400, 500, obtenerTipo());
 }
 
 // add platforms to the game
 function addPlatforms() {
   platforms = game.add.physicsGroup();
-  platforms.create(450, 150, 'platform');
+  platforms.create(150, 550, 'platform');
+  platforms.create(450, 550, 'platform');
+  platforms.create(325, 425, 'platform_2');
+  platforms.create(400, 325, 'platform');
+  platforms.create(75, 275, 'platform_2');
+  platforms.create(650, 275, 'platform');
+  platforms.create(150, 225, 'platform');
+  platforms.create(225, 125, 'platform_2');
+  platforms.create(500, 175, 'platform');
+  platforms.create(50, 75, 'platform_2');
   platforms.setAll('body.immovable', true);
 }
 
@@ -40,11 +78,29 @@ function createBadge() {
   badge.animations.play('spin', 10, true);
 }
 
+//Reactivar Salto temporalmente
+function reactivarSalto(){
+  jumpButton = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+}
+
 // when the player collects an item on the screen
 function itemHandler(player, item) {
   item.kill();
-  currentScore = currentScore + 10;
-  if (currentScore === winningScore) {
+  
+  if(item.key === 'coin'){
+    currentScore = currentScore + 10;
+  } else if(item.key === 'poison') {
+    currentLife = currentLife - 1;
+    if(currentLife === 0){
+      lost = true;
+      setTimeout('document.location.reload()',1000);
+    }
+  } else if(item.key === 'star') {
+    currentScore = currentScore + 20;
+  }
+  
+  
+  if (currentScore === winningScore && currentLife > 0) {
       createBadge();
   }
 }
@@ -65,15 +121,20 @@ window.onload = function () {
     
     //Load images
     game.load.image('platform', 'platform_1.png');
-    
+    game.load.image('platform_2', 'platform_2.png');
+    game.load.image('background', 'background.jpg');
+
     //Load spritesheets
     game.load.spritesheet('player', 'chalkers.png', 48, 62);
     game.load.spritesheet('coin', 'coin.png', 36, 44);
     game.load.spritesheet('badge', 'badge.png', 42, 54);
+    game.load.spritesheet('poison', 'poison.png', 32, 32);
+    game.load.spritesheet('star', 'star.png', 32, 32);
   }
 
   // initial game set up
   function create() {
+    background = game.add.sprite(0, 0, 'background');
     player = game.add.sprite(50, 600, 'player');
     player.animations.add('walk');
     player.anchor.setTo(0.5, 1);
@@ -87,13 +148,17 @@ window.onload = function () {
     cursors = game.input.keyboard.createCursorKeys();
     jumpButton = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
     text = game.add.text(16, 16, "SCORE: " + currentScore, { font: "bold 24px Arial", fill: "white" });
+    textLives = game.add.text(16, 40, "Lives: " + currentLife, { font: "bold 24px Arial", fill: "white" });
     winningMessage = game.add.text(game.world.centerX, 275, "", { font: "bold 48px Arial", fill: "white" });
     winningMessage.anchor.setTo(0.5, 1);
+    lostMessage = game.add.text(game.world.centerX, 275, "", { font: "bold 48px Arial", fill: "white" });
+    lostMessage.anchor.setTo(0.5, 1);
   }
 
   // while the game is running
   function update() {
     text.text = "SCORE: " + currentScore;
+    textLives.text = "LIVES: " + currentLife;
     game.physics.arcade.collide(player, platforms);
     game.physics.arcade.overlap(player, items, itemHandler);
     game.physics.arcade.overlap(player, badges, badgeHandler);
@@ -101,13 +166,17 @@ window.onload = function () {
 
     // is the left cursor key presssed?
     if (cursors.left.isDown) {
-      player.animations.play('walk', 10, true);
+      if (player.body.onFloor() || player.body.touching.down){
+        player.animations.play('walk', 10, true);
+      }
       player.body.velocity.x = -300;
       player.scale.x = - 1;
     }
     // is the right cursor key pressed?
     else if (cursors.right.isDown) {
-      player.animations.play('walk', 10, true);
+      if (player.body.onFloor() || player.body.touching.down){
+        player.animations.play('walk', 10, true);
+      }
       player.body.velocity.x = 300;
       player.scale.x = 1;
     }
@@ -118,10 +187,13 @@ window.onload = function () {
     
     if (jumpButton.isDown && (player.body.onFloor() || player.body.touching.down)) {
       player.body.velocity.y = -400;
+      player.animations.stop();
     }
     // when the player winw the game
     if (won) {
       winningMessage.text = "YOU WIN!!!";
+    } else if (lost){
+      lostMessage.text = "YOU LOOSE!!!";
     }
   }
 
